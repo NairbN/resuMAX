@@ -1,2 +1,0 @@
-# resuMAX
-Resume Optimizer
