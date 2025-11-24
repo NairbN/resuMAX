@@ -1,0 +1,48 @@
+# Cloud Build configuration for automatic deployment to Cloud Run
+
+steps:
+  # Step 1: Build the Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'build',
+      '-t', 'gcr.io/$PROJECT_ID/resumax-api:$COMMIT_SHA',
+      '-t', 'gcr.io/$PROJECT_ID/resumax-api:latest',
+      '.'
+    ]
+    dir: 'backend'
+
+  # Step 2: Push the Docker image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/resumax-api:$COMMIT_SHA']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/resumax-api:latest']
+
+  # Step 3: Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args: [
+      'run', 'deploy', 'resumax-api',
+      '--image', 'gcr.io/$PROJECT_ID/resumax-api:$COMMIT_SHA',
+      '--region', 'us-central1',
+      '--platform', 'managed',
+      '--allow-unauthenticated',  # Remove this if you want authentication
+      '--set-env-vars', 'GCS_BUCKET_NAME=resumax-resumes',
+      '--memory', '1Gi',
+      '--cpu', '1',
+      '--max-instances', '10',
+      '--min-instances', '0',  # Scale to zero when not in use
+      '--timeout', '300',  # 5 minute timeout for long processing
+    ]
+
+# Store images in Google Container Registry
+images:
+  - 'gcr.io/$PROJECT_ID/resumax-api:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/resumax-api:latest'
+
+# Build timeout
+timeout: 1200s  # 20 minutes
+
+options:
+  machineType: 'N1_HIGHCPU_8'
+  logging: CLOUD_LOGGING_ONLY
