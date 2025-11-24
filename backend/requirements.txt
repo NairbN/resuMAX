@@ -24,3 +24,6 @@ reportlab==4.2.0
 
 # Utilities
 python-multipart==0.0.12
+
+# Authentication
+firebase-admin==6.5.0

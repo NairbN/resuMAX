@@ -1,0 +1,11 @@
+services:
+  backend:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      # Add other env vars here if needed, e.g. GOOGLE_APPLICATION_CREDENTIALS
+    volumes:
+      - ./app:/app/app  # Hot reload for development
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload
