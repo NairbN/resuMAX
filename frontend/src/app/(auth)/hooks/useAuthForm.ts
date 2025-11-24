@@ -1,5 +1,7 @@
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import type { AuthResponse } from "@/app/(auth)/lib/auth-client";
+import { routes } from "@/lib/routes";
 
 type Mode = "login" | "signup";
 
@@ -12,6 +14,7 @@ export function useAuthForm({ mode, onSuccess }: UseAuthFormArgs) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
+  const router = useRouter();
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -44,9 +47,13 @@ export function useAuthForm({ mode, onSuccess }: UseAuthFormArgs) {
     console.log(`[auth] ${mode} success (client)`, { userId: result.userId });
     setLoading(false);
 
-    if (onSuccess) {
-      startTransition(() => onSuccess());
-    }
+    startTransition(() => {
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        router.push(routes.dashboard);
+      }
+    });
   }
 
   return { loading, error, handleSubmit };

@@ -1,0 +1,12 @@
+.next
+node_modules
+npm-debug.log*
+Dockerfile*
+docker-compose*
+.git
+.gitignore
+.env
+.env.*.local
+.env.local
+.vscode
+.idea

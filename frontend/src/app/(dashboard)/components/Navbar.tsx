@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { routes } from "@/lib/routes";
 
 const navItems = [
@@ -9,6 +10,13 @@ const navItems = [
 ];
 
 export function Navbar() {
+  const router = useRouter();
+
+  function handleLogout() {
+    // TODO: clear auth cookie/session when real auth is wired
+    router.push(routes.home);
+  }
+
   return (
     <header className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-5 py-4 shadow-sm shadow-black/30">
       <div className="flex items-center gap-3">
@@ -24,7 +32,9 @@ export function Navbar() {
       </nav>
       <div className="flex items-center gap-3">
         <div className="h-10 w-10 rounded-full bg-white/20" />
-        <button className="text-sm text-white/70 hover:text-emerald-200">Logout</button>
+        <button onClick={handleLogout} className="text-sm text-white/70 hover:text-emerald-200">
+          Logout
+        </button>
       </div>
     </header>
   );
