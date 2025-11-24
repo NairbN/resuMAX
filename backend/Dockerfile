@@ -1,11 +1,12 @@
 # Build stage
-FROM python:3.13-slim as builder
+FROM python:3.11-slim as builder
 
 WORKDIR /app
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
     gcc \
+    g++ \
     && rm -rf /var/lib/apt/lists/*
 
 # Install python dependencies
@@ -16,7 +17,7 @@ RUN pip install --user --no-cache-dir -r requirements.txt
 RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
 
 # Runtime stage
-FROM python:3.13-slim
+FROM python:3.11-slim
 
 WORKDIR /app
 
