@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { logout } from "@/app/(auth)/lib/auth-client";
 import { routes } from "@/lib/routes";
 
 const navItems = [
@@ -12,8 +13,12 @@ const navItems = [
 export function Navbar() {
   const router = useRouter();
 
-  function handleLogout() {
-    // TODO: clear auth cookie/session when real auth is wired
+  async function handleLogout() {
+    try {
+      await logout();
+    } catch {
+      // ignore logout errors for now
+    }
     router.push(routes.home);
   }
 

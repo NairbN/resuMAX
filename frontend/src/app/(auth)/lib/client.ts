@@ -1,3 +1,10 @@
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+} from "firebase/auth";
+import { auth } from "@/lib/firebase/client";
+
 export type AuthPayload = {
   email: string;
   password: string;
@@ -8,23 +15,30 @@ export type AuthResponse =
   | { ok: true; userId: string }
   | { ok: false; error: string };
 
-// Placeholder auth calls; replace with Firebase/Backend wiring.
 export async function login(payload: AuthPayload): Promise<AuthResponse> {
-  await delay();
-  if (!payload.email || !payload.password) {
-    return { ok: false, error: "Missing credentials" };
+  try {
+    if (!payload.email || !payload.password) {
+      return { ok: false, error: "Missing credentials" };
+    }
+    const cred = await signInWithEmailAndPassword(auth, payload.email, payload.password);
+    return { ok: true, userId: cred.user.uid };
+  } catch (error: any) {
+    return { ok: false, error: error?.message || "Unable to log in" };
   }
-  return { ok: true, userId: "mock-user-id" };
 }
 
 export async function signup(payload: AuthPayload): Promise<AuthResponse> {
-  await delay();
-  if (!payload.email || !payload.password) {
-    return { ok: false, error: "Missing credentials" };
+  try {
+    if (!payload.email || !payload.password) {
+      return { ok: false, error: "Missing credentials" };
+    }
+    const cred = await createUserWithEmailAndPassword(auth, payload.email, payload.password);
+    return { ok: true, userId: cred.user.uid };
+  } catch (error: any) {
+    return { ok: false, error: error?.message || "Unable to sign up" };
   }
-  return { ok: true, userId: "mock-user-id" };
 }
 
-function delay(ms = 500) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+export async function logout(): Promise<void> {
+  await signOut(auth);
 }

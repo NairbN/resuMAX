@@ -1,6 +1,6 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import type { AuthResponse } from "@/app/(auth)/lib/auth-client";
+import { login, signup } from "@/app/(auth)/lib/auth-client";
 import { routes } from "@/lib/routes";
 
 type Mode = "login" | "signup";
@@ -26,17 +26,10 @@ export function useAuthForm({ mode, onSuccess }: UseAuthFormArgs) {
     const password = String(formData.get("password") || "");
     const name = String(formData.get("name") || "").trim();
 
-    const endpoint = mode === "login" ? "/api/auth/login" : "/api/auth/signup";
-
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ name, email, password }),
-    });
-
-    const result = (await response.json()) as AuthResponse;
+    const result =
+      mode === "login"
+        ? await login({ email, password })
+        : await signup({ name, email, password });
 
     if (!result.ok) {
       setError(result.error);
@@ -45,9 +38,11 @@ export function useAuthForm({ mode, onSuccess }: UseAuthFormArgs) {
     }
 
     console.log(`[auth] ${mode} success (client)`, { userId: result.userId });
-    setLoading(false);
 
     startTransition(() => {
+      // Temporary session indicator for middleware; replace with real session cookie once backend sets it.
+      document.cookie = "auth-token=client-session; path=/;";
+      setLoading(false);
       if (onSuccess) {
         onSuccess();
       } else {

@@ -46,6 +46,11 @@ export async function signup(payload: AuthPayload): Promise<AuthResponse> {
   return { ok: true, userId: email };
 }
 
+export async function logout(): Promise<void> {
+  await delay();
+  return;
+}
+
 function delay(ms = 500) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
