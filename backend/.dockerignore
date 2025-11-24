@@ -52,3 +52,8 @@ docs/
 # Other
 *.log
 .DS_Store
+
+# Node (shouldn't be in backend)
+node_modules/
+package.json
+package-lock.json
