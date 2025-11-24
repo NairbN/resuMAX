@@ -12,7 +12,8 @@ import { useDashboardData } from "@/app/(dashboard)/hooks/useDashboardData";
 import { routes } from "@/lib/routes";
 
 export default function DashboardPage() {
-  const data = useDashboardData();
+  const userId = process.env.NEXT_PUBLIC_DEMO_USER_ID || "demo-user";
+  const data = useDashboardData(userId);
 
   return (
     <DashboardShell>
@@ -38,7 +39,7 @@ export default function DashboardPage() {
               title="Upload Resume"
               subtitle="Resume status"
               actionLabel="Upload your resume"
-              href="#"
+              href={routes.upload}
             >
               <p className="text-sm text-white/80">Last uploaded: {data.lastUpload.date}</p>
               <p className="text-sm text-emerald-300">

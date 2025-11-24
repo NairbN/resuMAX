@@ -5,6 +5,7 @@ import { routes } from "@/lib/routes";
 
 const navItems = [
   { label: "Dashboard", href: routes.dashboard },
+  { label: "Upload", href: routes.upload },
   { label: "Profile", href: "/profile" },
   { label: "Jobs", href: "/jobs" },
   { label: "Optimizations", href: "/optimizations" },
