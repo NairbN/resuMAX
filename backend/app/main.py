@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -12,9 +12,20 @@ from app.resume_parser import parse_resume
 from app.job_parser import parse_job_description
 from app.optimizer import optimize_resume
 from app.storage import upload_to_gcs, download_from_gcs
+from app.storage import upload_to_gcs, download_from_gcs
 from app.database import save_resume_metadata, get_resume_metadata
+from app.auth import get_current_user
 
 app = FastAPI(title="resuMAX API", version="1.0.0")
+
+# Pre-load the semantic model on startup to avoid first-request timeout
+@app.on_event("startup")
+async def startup_event():
+    """Pre-load heavy models on startup"""
+    print("🚀 Loading semantic matching model...")
+    from app.semantic_matcher import get_semantic_matcher
+    matcher = get_semantic_matcher()
+    print("✅ Model loaded and ready!")
 
 # CORS - allow your frontend to call this API
 app.add_middleware(
@@ -26,7 +37,6 @@ app.add_middleware(
 )
 
 class JobDescriptionRequest(BaseModel):
-    user_id: str
     resume_id: str
     job_description: str
     job_title: Optional[str] = None
@@ -48,8 +58,8 @@ async def health_check():
 
 @app.post("/upload-resume")
 async def upload_resume(
-    user_id: str,
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    user_id: str = Depends(get_current_user)
 ):
     """
     Upload a resume (PDF/DOCX) and store it in Cloud Storage.
@@ -121,7 +131,10 @@ async def upload_resume(
         raise HTTPException(status_code=500, detail=f"Error uploading resume: {str(e)}")
 
 @app.post("/job-description")
-async def process_job_description(request: JobDescriptionRequest):
+async def process_job_description(
+    request: JobDescriptionRequest,
+    user_id: str = Depends(get_current_user)
+):
     """
     Process job description and optimize the resume based on it.
 
@@ -133,7 +146,7 @@ async def process_job_description(request: JobDescriptionRequest):
     """
     try:
         # Get resume metadata from Firestore
-        metadata = get_resume_metadata(request.resume_id, request.user_id)
+        metadata = get_resume_metadata(request.resume_id, user_id)
         if not metadata:
             raise HTTPException(status_code=404, detail="Resume not found")
 
@@ -161,7 +174,7 @@ async def process_job_description(request: JobDescriptionRequest):
 
         # Upload optimized resume to Cloud Storage
         file_extension = "pdf"  # Always output as PDF
-        optimized_path = f"resumes/{request.user_id}/optimized/{request.resume_id}_optimized.{file_extension}"
+        optimized_path = f"resumes/{user_id}/optimized/{request.resume_id}_optimized.{file_extension}"
 
         optimized_url = upload_to_gcs(
             bucket_name=bucket_name,
@@ -192,7 +205,11 @@ async def process_job_description(request: JobDescriptionRequest):
         raise HTTPException(status_code=500, detail=f"Error optimizing resume: {str(e)}")
 
 @app.get("/download-resume/{resume_id}")
-async def download_resume(resume_id: str, user_id: str, version: str = "optimized"):
+async def download_resume(
+    resume_id: str, 
+    version: str = "optimized",
+    user_id: str = Depends(get_current_user)
+):
     """
     Download a resume (original or optimized).
 
@@ -242,8 +259,8 @@ async def download_resume(resume_id: str, user_id: str, version: str = "optimize
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error downloading resume: {str(e)}")
 
-@app.get("/resumes/{user_id}")
-async def list_resumes(user_id: str):
+@app.get("/resumes")
+async def list_resumes(user_id: str = Depends(get_current_user)):
     """
     List all resumes for a user.
 

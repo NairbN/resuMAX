@@ -1,0 +1,5 @@
+# Development requirements (local testing only)
+-r requirements.txt  # Include all production requirements
+
+# Local GUI
+streamlit==1.40.0
