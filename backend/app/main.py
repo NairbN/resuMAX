@@ -223,7 +223,7 @@ async def download_resume(
     """
     try:
         # Get resume metadata
-        metadata = get_resume_metadata(resume_id)
+        metadata = get_resume_metadata(resume_id, user_id)
         if not metadata:
             raise HTTPException(status_code=404, detail="Resume not found")
 
@@ -277,3 +277,50 @@ async def list_resumes(user_id: str = Depends(get_current_user)):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error listing resumes: {str(e)}")
+
+@app.delete("/resume/{resume_id}")
+async def delete_resume(
+    resume_id: str,
+    user_id: str = Depends(get_current_user)
+):
+    """
+    Delete a resume and its associated files.
+
+    Args:
+        resume_id: Resume ID to delete
+        user_id: Firebase Auth user ID (from token)
+
+    Returns:
+        Success message
+    """
+    try:
+        from app.database import get_resume_metadata, delete_resume_metadata
+        from app.storage import delete_from_gcs
+
+        # Get resume metadata to verify ownership
+        metadata = get_resume_metadata(resume_id, user_id)
+        if not metadata:
+            raise HTTPException(status_code=404, detail="Resume not found")
+
+        if metadata.get("userId") != user_id:
+            raise HTTPException(status_code=403, detail="Unauthorized to delete this resume")
+
+        # Delete files from storage
+        bucket_name = os.getenv("GCS_BUCKET_NAME", "resumax-resumes")
+        try:
+            if metadata.get("originalFile"):
+                delete_from_gcs(bucket_name, metadata["originalFile"])
+            if metadata.get("optimizedFile"):
+                delete_from_gcs(bucket_name, metadata["optimizedFile"])
+        except Exception as e:
+            print(f"Warning: Failed to delete files from storage: {e}")
+
+        # Delete metadata from database
+        delete_resume_metadata(resume_id, user_id)
+
+        return {"message": "Resume deleted successfully", "resumeId": resume_id}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error deleting resume: {str(e)}")

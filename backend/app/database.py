@@ -2,11 +2,23 @@
 Firestore Database Module
 
 Handles resume metadata storage and retrieval in Firestore.
+For local testing, uses in-memory storage instead.
 """
 
+import os
 from typing import Dict, List, Optional, Any
-from google.cloud import firestore
 from datetime import datetime
+
+# Check if we're in local testing mode
+LOCAL_TESTING = os.getenv("LOCAL_TESTING", "false").lower() == "true"
+
+# In-memory storage for local testing
+_local_db: Dict[str, Dict[str, Any]] = {}
+
+if LOCAL_TESTING:
+    print("💾 Using in-memory database for local testing")
+else:
+    from google.cloud import firestore
 
 
 def get_firestore_client():
@@ -18,6 +30,8 @@ def get_firestore_client():
         - GOOGLE_APPLICATION_CREDENTIALS environment variable
         - gcloud auth application-default login
     """
+    if LOCAL_TESTING:
+        return None  # Not needed for local storage
     return firestore.Client()
 
 
@@ -56,8 +70,6 @@ def save_resume_metadata(resume_id: str, metadata: Dict[str, Any]) -> None:
     """
 
     try:
-        db = get_firestore_client()
-
         user_id = metadata.get("userId")
         if not user_id:
             raise Exception("userId is required in metadata")
@@ -67,7 +79,18 @@ def save_resume_metadata(resume_id: str, metadata: Dict[str, Any]) -> None:
         if len(existing_resumes) >= 5 and resume_id not in [r['resumeId'] for r in existing_resumes]:
             raise Exception("Resume limit reached. Users can have maximum 5 resumes. Delete old resumes first.")
 
-        # Save to user's resumes subcollection
+        # LOCAL TESTING: Use in-memory storage
+        if LOCAL_TESTING:
+            key = f"{user_id}:{resume_id}"
+            if key in _local_db:
+                # Merge with existing
+                _local_db[key].update(metadata)
+            else:
+                _local_db[key] = metadata.copy()
+            return
+
+        # PRODUCTION: Use Firestore
+        db = get_firestore_client()
         user_resume_ref = db.collection("users").document(user_id).collection("resumes").document(resume_id)
         user_resume_ref.set(metadata, merge=True)
 
@@ -93,6 +116,12 @@ def get_resume_metadata(resume_id: str, user_id: str) -> Optional[Dict[str, Any]
     """
 
     try:
+        # LOCAL TESTING: Use in-memory storage
+        if LOCAL_TESTING:
+            key = f"{user_id}:{resume_id}"
+            return _local_db.get(key)
+
+        # PRODUCTION: Use Firestore
         db = get_firestore_client()
         doc_ref = db.collection("users").document(user_id).collection("resumes").document(resume_id)
         doc = doc_ref.get()
@@ -123,6 +152,18 @@ def list_user_resumes(user_id: str, limit: int = 50) -> List[Dict[str, Any]]:
     """
 
     try:
+        # LOCAL TESTING: Use in-memory storage
+        if LOCAL_TESTING:
+            resumes = []
+            for key, metadata in _local_db.items():
+                if metadata.get("userId") == user_id:
+                    resumes.append(metadata)
+
+            # Sort by uploadedAt (newest first)
+            resumes.sort(key=lambda x: x.get("uploadedAt", ""), reverse=True)
+            return resumes[:limit]
+
+        # PRODUCTION: Use Firestore
         db = get_firestore_client()
 
         # Query user's resumes subcollection
@@ -159,12 +200,20 @@ def delete_resume_metadata(resume_id: str, user_id: str) -> None:
     """
 
     try:
-        db = get_firestore_client()
-
         # Verify ownership before deleting
-        metadata = get_resume_metadata(resume_id)
+        metadata = get_resume_metadata(resume_id, user_id)
         if not metadata or metadata.get("userId") != user_id:
             raise Exception("Unauthorized: Resume not found or doesn't belong to user")
+
+        # LOCAL TESTING: Delete from in-memory storage
+        if LOCAL_TESTING:
+            key = f"{user_id}:{resume_id}"
+            if key in _local_db:
+                del _local_db[key]
+            return
+
+        # PRODUCTION: Delete from Firestore
+        db = get_firestore_client()
 
         # Delete from main resumes collection
         db.collection("resumes").document(resume_id).delete()

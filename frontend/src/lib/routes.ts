@@ -4,6 +4,7 @@ export const routes = {
   signup: "/auth/signup",
   workspace: "/workspace",
   upload: "/upload",
+  optimize: "/optimize",
   profile: "/profile",
 } as const;
 

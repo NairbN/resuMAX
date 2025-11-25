@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# Environment Variables (SECRETS - DO NOT COMMIT!)
+.env
+*.env
+!.env.example
+
+# Firebase Service Account Keys (SECRETS - DO NOT COMMIT!)
+*serviceAccountKey.json
+*firebase-adminsdk*.json
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs
+*.log
+
+# Cloud Build
+.gcloud/
+
+# Node (frontend)
+node_modules/
+.next/
+out/

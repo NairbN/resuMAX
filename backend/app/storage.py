@@ -2,11 +2,24 @@
 Google Cloud Storage Module
 
 Handles file uploads and downloads to/from Google Cloud Storage.
+For local testing, uses filesystem storage instead.
 """
 
 import os
 from typing import Optional
-from google.cloud import storage
+from pathlib import Path
+
+# Check if we're in local testing mode
+LOCAL_TESTING = os.getenv("LOCAL_TESTING", "false").lower() == "true"
+
+# Local storage directory for testing
+LOCAL_STORAGE_DIR = Path("/tmp/resumax-local-storage")
+
+if LOCAL_TESTING:
+    LOCAL_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+    print(f"📁 Using local storage: {LOCAL_STORAGE_DIR}")
+else:
+    from google.cloud import storage
 
 
 def get_storage_client():
@@ -18,6 +31,8 @@ def get_storage_client():
         - GOOGLE_APPLICATION_CREDENTIALS environment variable
         - gcloud auth application-default login
     """
+    if LOCAL_TESTING:
+        return None  # Not needed for local storage
     return storage.Client()
 
 
@@ -28,7 +43,7 @@ def upload_to_gcs(
     content_type: Optional[str] = None
 ) -> str:
     """
-    Upload file content to Google Cloud Storage.
+    Upload file content to Google Cloud Storage (or local filesystem in testing).
 
     Args:
         bucket_name: GCS bucket name (e.g., "resumax-resumes")
@@ -49,6 +64,14 @@ def upload_to_gcs(
     """
 
     try:
+        # LOCAL TESTING: Use filesystem
+        if LOCAL_TESTING:
+            local_path = LOCAL_STORAGE_DIR / destination_path
+            local_path.parent.mkdir(parents=True, exist_ok=True)
+            local_path.write_bytes(content)
+            return f"local://{destination_path}"
+
+        # PRODUCTION: Use GCS
         client = get_storage_client()
         bucket = client.bucket(bucket_name)
         blob = bucket.blob(destination_path)
@@ -60,9 +83,6 @@ def upload_to_gcs(
         # Upload the file
         blob.upload_from_string(content)
 
-        # Make the file publicly readable (optional - you may want signed URLs instead)
-        # blob.make_public()
-
         # Return the public URL
         return f"gs://{bucket_name}/{destination_path}"
 
@@ -72,7 +92,7 @@ def upload_to_gcs(
 
 def download_from_gcs(bucket_name: str, source_path: str) -> bytes:
     """
-    Download file from Google Cloud Storage.
+    Download file from Google Cloud Storage (or local filesystem in testing).
 
     Args:
         bucket_name: GCS bucket name
@@ -89,6 +109,14 @@ def download_from_gcs(bucket_name: str, source_path: str) -> bytes:
     """
 
     try:
+        # LOCAL TESTING: Use filesystem
+        if LOCAL_TESTING:
+            local_path = LOCAL_STORAGE_DIR / source_path
+            if not local_path.exists():
+                raise FileNotFoundError(f"File not found: {source_path}")
+            return local_path.read_bytes()
+
+        # PRODUCTION: Use GCS
         client = get_storage_client()
         bucket = client.bucket(bucket_name)
         blob = bucket.blob(source_path)
@@ -117,6 +145,14 @@ def delete_from_gcs(bucket_name: str, path: str) -> None:
     """
 
     try:
+        # LOCAL TESTING: Delete from filesystem
+        if LOCAL_TESTING:
+            local_path = LOCAL_STORAGE_DIR / path
+            if local_path.exists():
+                local_path.unlink()
+            return
+
+        # PRODUCTION: Delete from GCS
         client = get_storage_client()
         bucket = client.bucket(bucket_name)
         blob = bucket.blob(path)

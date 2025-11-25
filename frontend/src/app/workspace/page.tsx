@@ -30,7 +30,7 @@ export default function DashboardPage() {
                     Paste a job description to kick off optimization against your latest resume.
                   </p>
                 </div>
-                <Button variant="primary" href={routes.upload}>
+                <Button variant="primary" href={routes.optimize}>
                   Add Job Description
                 </Button>
               </div>

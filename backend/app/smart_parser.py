@@ -157,8 +157,8 @@ def is_bullet_point(line: str) -> bool:
     if not line_stripped:
         return False
 
-    # Bullet characters
-    bullet_chars = ['•', '-', '*', '○', '▪', '▫', '■', '□', '◦', '‣', '⁃']
+    # Bullet characters (including all common Unicode bullets)
+    bullet_chars = ['•', '-', '*', '○', '▪', '▫', '■', '□', '◦', '‣', '⁃', '●', '◉', '▸', '▹', '►', '▻', '⦿', '⦾']
     if any(line_stripped.startswith(char) for char in bullet_chars):
         return True
 
@@ -221,7 +221,7 @@ def extract_bullets_from_text(text: str) -> List[str]:
                 bullets.append(current_bullet.strip())
 
             # Start new bullet (remove bullet character)
-            cleaned = line_stripped.lstrip('•-*○▪▫■□◦‣⁃ ')
+            cleaned = line_stripped.lstrip('•-*○▪▫■□◦‣⁃●◉▸▹►▻⦿⦾ ')
             cleaned = re.sub(r'^\d+\.\s*', '', cleaned)  # Remove numbers
             current_bullet = cleaned
         else:
@@ -343,6 +343,218 @@ def extract_skills(text: str) -> Dict[str, List[str]]:
     return skills_by_category
 
 
+def extract_experience_entries(text: str) -> List[Dict[str, Any]]:
+    """
+    Extract structured experience entries with company, title, dates, and bullets.
+
+    Returns list of experience dicts:
+        [
+            {
+                "company": "OPEN SOURCE",
+                "title": "Software Engineer",
+                "date": "Sep 2025 – Nov 2025",
+                "location": "Remote",
+                "bullets": ["Built scalable...", "Developed..."]
+            }
+        ]
+    """
+    sections = parse_sections(text)
+    experience_text = sections.get('experience', '')
+
+    if not experience_text:
+        return []
+
+    entries = []
+    lines = experience_text.split('\n')
+    current_entry = None
+    current_bullets = []
+
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+
+        if not line:
+            i += 1
+            continue
+
+        # Check if this looks like a company/title line
+        # Usually in format: "COMPANY    Location" or "Title    Date"
+        if not is_bullet_point(line):
+            # Save previous entry
+            if current_entry and current_bullets:
+                current_entry['bullets'] = current_bullets
+                entries.append(current_entry)
+
+            # Start new entry
+            # Try to parse company/location
+            parts = line.split('    ')  # Multiple spaces separate company/location
+            company = parts[0].strip()
+            location = parts[1].strip() if len(parts) > 1 else ""
+
+            # Next line might be title and date
+            title = ""
+            date = ""
+            if i + 1 < len(lines):
+                next_line = lines[i + 1].strip()
+                if not is_bullet_point(next_line) and next_line:
+                    title_parts = next_line.split('    ')
+                    title = title_parts[0].strip()
+                    date = title_parts[1].strip() if len(title_parts) > 1 else ""
+                    i += 1  # Skip next line since we processed it
+
+            current_entry = {
+                "company": company,
+                "title": title,
+                "date": date,
+                "location": location,
+            }
+            current_bullets = []
+
+        # It's a bullet
+        elif is_bullet_point(line):
+            # Clean bullet
+            cleaned = line.strip().lstrip('•-*○▪▫■□◦‣⁃●◉▸▹►▻⦿⦾ ')
+            cleaned = re.sub(r'^\d+\.\s*', '', cleaned)
+            if cleaned:  # Only add non-empty bullets
+                current_bullets.append(cleaned)
+
+        i += 1
+
+    # Save last entry
+    if current_entry and current_bullets:
+        current_entry['bullets'] = current_bullets
+        entries.append(current_entry)
+
+    return entries
+
+
+def extract_project_entries(text: str) -> List[Dict[str, Any]]:
+    """
+    Extract structured project entries.
+
+    Returns:
+        [
+            {
+                "name": "Video Platform",
+                "tech_stack": "TypeScript, React, Next.js, Node.js, Firebase, Docker, GCP",
+                "bullets": ["Built a fullstack...", "Implemented token based..."]
+            }
+        ]
+    """
+    sections = parse_sections(text)
+    projects_text = sections.get('projects', '')
+
+    if not projects_text:
+        return []
+
+    entries = []
+    lines = projects_text.split('\n')
+    current_entry = None
+    current_bullets = []
+
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+
+        if not line:
+            i += 1
+            continue
+
+        # Check if this is a project header (has tech stack with |)
+        if '|' in line and not is_bullet_point(line):
+            # Save previous entry
+            if current_entry and current_bullets:
+                current_entry['bullets'] = current_bullets
+                entries.append(current_entry)
+
+            # Parse project header: "Video Platform | TypeScript, React, Next.js..."
+            parts = line.split('|', 1)
+            name = parts[0].strip()
+            tech_stack = parts[1].strip() if len(parts) > 1 else ""
+
+            current_entry = {
+                "name": name,
+                "tech_stack": tech_stack,
+            }
+            current_bullets = []
+
+        # It's a bullet
+        elif is_bullet_point(line):
+            # Clean bullet
+            cleaned = line.strip().lstrip('•-*○▪▫■□◦‣⁃●◉▸▹►▻⦿⦾ ')
+            cleaned = re.sub(r'^\d+\.\s*', '', cleaned)
+            if cleaned:
+                current_bullets.append(cleaned)
+
+        i += 1
+
+    # Save last entry
+    if current_entry and current_bullets:
+        current_entry['bullets'] = current_bullets
+        entries.append(current_entry)
+
+    return entries
+
+
+def extract_education_entries(text: str) -> List[Dict[str, Any]]:
+    """
+    Extract structured education entries.
+
+    Returns:
+        [
+            {
+                "school": "UNIVERSITY OF CALIFORNIA, SAN DIEGO",
+                "degree": "B.S. in Mathematics-Computer Science",
+                "year": "Sep 2025",
+                "location": "La Jolla, CA"
+            }
+        ]
+    """
+    sections = parse_sections(text)
+    education_text = sections.get('education', '')
+
+    if not education_text:
+        return []
+
+    entries = []
+    lines = education_text.split('\n')
+
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+
+        if not line:
+            i += 1
+            continue
+
+        # School line (usually has location at end)
+        parts = line.split('    ')
+        school = parts[0].strip()
+        location = parts[1].strip() if len(parts) > 1 else ""
+
+        # Next line is degree and date
+        degree = ""
+        year = ""
+        if i + 1 < len(lines):
+            next_line = lines[i + 1].strip()
+            if next_line:
+                degree_parts = next_line.split('    ')
+                degree = degree_parts[0].strip()
+                year = degree_parts[1].strip() if len(degree_parts) > 1 else ""
+                i += 1
+
+        entries.append({
+            "school": school,
+            "degree": degree,
+            "year": year,
+            "location": location
+        })
+
+        i += 1
+
+    return entries
+
+
 def parse_resume_smart(text: str) -> Dict[str, Any]:
     """
     Smart resume parser that handles ANY format.
@@ -368,11 +580,14 @@ def parse_resume_smart(text: str) -> Dict[str, Any]:
             "contact_info": {
                 "email": "rymao_@outlook.com",
                 "phone": "(607)232-8826",
+                "name": "Ryley Mao",
                 "github": "github.com/ryleymao",
                 "linkedin": "linkedin.com/in/ryley-mao",
                 "website": "rymao.info"
             },
-            "skills": ["Python", "Java", "JavaScript", ...],
+            "experience": [...],  # Structured entries
+            "education": [...],   # Structured entries
+            "skills": {"Languages & Frameworks": ["Python", ...]},
             "bullet_count": 15
         }
     """
@@ -380,11 +595,33 @@ def parse_resume_smart(text: str) -> Dict[str, Any]:
     # Extract contact info
     contact = extract_contact_info(text)
 
+    # Try to extract name from first few lines
+    name = ""
+    first_lines = text.split('\n')[:3]
+    for line in first_lines:
+        line_clean = line.strip()
+        # Name is usually the first line, short, and has capital letters
+        if line_clean and len(line_clean) < 50 and not '@' in line and not 'http' in line:
+            # Check if it looks like a name (has spaces, mostly letters)
+            words = line_clean.split()
+            if 2 <= len(words) <= 4 and all(w[0].isupper() for w in words if w):
+                name = line_clean
+                break
+
     # Parse sections
     sections = parse_sections(text)
 
-    # Extract bullets
+    # Extract bullets (flat list)
     bullets = extract_bullets_from_text(text)
+
+    # Extract structured experience
+    experience = extract_experience_entries(text)
+
+    # Extract structured projects
+    projects = extract_project_entries(text)
+
+    # Extract structured education
+    education = extract_education_entries(text)
 
     # Extract skills
     skills = extract_skills(text)
@@ -395,12 +632,17 @@ def parse_resume_smart(text: str) -> Dict[str, Any]:
         "bullet_count": len(bullets),
         "sections": sections,
         "contact_info": {
+            "name": name,
             "email": contact.email,
             "phone": contact.phone,
             "github": contact.github,
             "linkedin": contact.linkedin,
-            "website": contact.website
+            "website": contact.website,
+            "location": contact.location
         },
+        "experience": experience,  # Structured experience entries
+        "projects": projects,       # NEW: Structured project entries
+        "education": education,     # Structured education entries
         "skills": skills,
         "has_education": 'education' in sections,
         "has_experience": 'experience' in sections,

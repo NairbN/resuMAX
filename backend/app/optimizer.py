@@ -46,6 +46,16 @@ def optimize_resume(
     resume_text = parsed_resume.get("text", "")
     job_description = job_keywords.get("raw_text", "")
 
+    # DEBUG: Log what we extracted
+    print(f"\n🔍 DEBUG - Optimization Input:")
+    print(f"  - Found {len(bullets)} bullets in resume")
+    print(f"  - Resume text length: {len(resume_text)} chars")
+    print(f"  - Job description length: {len(job_description)} chars")
+    if bullets:
+        print(f"  - First bullet: {bullets[0][:100]}...")
+    else:
+        print(f"  - ⚠️  WARNING: No bullets found!")
+
     # Auto-detect industry if not provided
     if not industry:
         industry = detect_industry(job_description)
@@ -97,7 +107,41 @@ def optimize_resume(
     # === STEP 7: Calculate overall resume-job match ===
     overall_score = matcher.compute_overall_score(resume_text, job_description)
 
-    # === STEP 8: Generate new PDF ===
+    # === STEP 8: Reorder bullets within each job AND project ===
+    # Create a ranking map for all bullets
+    bullet_ranks = {item["bullet"]: item["score"] for item in semantic_results}
+
+    # Reorder bullets within each experience entry
+    experiences = parsed_resume.get("experience", [])
+    if experiences:
+        for exp in experiences:
+            exp_bullets = exp.get("bullets", [])
+            if exp_bullets:
+                # Sort this job's bullets by relevance score
+                exp["bullets"] = sorted(
+                    exp_bullets,
+                    key=lambda b: bullet_ranks.get(b, 0),
+                    reverse=True
+                )
+        # Update parsed resume with reordered bullets
+        parsed_resume["experience"] = experiences
+
+    # Reorder bullets within each project entry
+    projects = parsed_resume.get("projects", [])
+    if projects:
+        for proj in projects:
+            proj_bullets = proj.get("bullets", [])
+            if proj_bullets:
+                # Sort this project's bullets by relevance score
+                proj["bullets"] = sorted(
+                    proj_bullets,
+                    key=lambda b: bullet_ranks.get(b, 0),
+                    reverse=True
+                )
+        # Update parsed resume with reordered bullets
+        parsed_resume["projects"] = projects
+
+    # === STEP 9: Generate new PDF ===
     optimized_pdf = generate_optimized_pdf(
         parsed_resume=parsed_resume,
         optimized_bullets=optimized_bullets,
@@ -133,6 +177,13 @@ def optimize_resume(
             for category, bullets_list in categorized.items()
         }
     }
+
+    # DEBUG: Log what we're returning
+    print(f"\n📊 DEBUG - Optimization Results:")
+    print(f"  - Overall score: {scores['overall_score']}")
+    print(f"  - Comparison: {comparison}")
+    print(f"  - Optimized {len(optimized_bullets)} bullets")
+    print(f"  - Top bullet score: {scores['top_bullets'][0]['score'] if scores['top_bullets'] else 'N/A'}")
 
     return optimized_pdf, scores
 
@@ -234,26 +285,266 @@ def generate_optimized_pdf(
     original_content: bytes
 ) -> bytes:
     """
-    Generate a new PDF with optimized bullet order.
+    Generate a professional, ATS-friendly PDF resume with optimized bullets.
 
-    TODO: Implement PDF generation using reportlab or weasyprint:
-
-    Option 1: Using reportlab (pure PDF generation)
-        from reportlab.lib.pagesizes import letter
-        from reportlab.pdfgen import canvas
-
-    Option 2: Using weasyprint (HTML to PDF)
-        from weasyprint import HTML
-        html_content = generate_html_resume(parsed_resume, bullet_scores)
-        pdf_bytes = HTML(string=html_content).write_pdf()
-
-    For now, just return the original content (no optimization applied)
+    Creates a complete, job-ready resume that preserves all original information
+    but reorders bullets for maximum relevance to the job.
     """
+    from reportlab.lib.pagesizes import letter
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.units import inch
+    from reportlab.lib.colors import HexColor
+    from io import BytesIO
+    import textwrap
 
-    # PLACEHOLDER: Return original content for now
-    # TODO: Implement proper PDF generation with reordered bullets
+    # Create PDF in memory
+    buffer = BytesIO()
+    c = canvas.Canvas(buffer, pagesize=letter)
+    width, height = letter
 
-    return original_content
+    # Define colors for a professional look
+    dark_blue = HexColor('#1a1a2e')
+    light_blue = HexColor('#0f3460')
+    text_color = HexColor('#2d2d2d')
+
+    # Starting position
+    y = height - 0.75 * inch
+    margin_left = 0.75 * inch
+    margin_right = width - 0.75 * inch
+    content_width = margin_right - margin_left
+
+    # === HEADER: Name and Contact ===
+    contact_info = parsed_resume.get("contact_info", {})
+
+    # Name (large, bold)
+    c.setFillColor(dark_blue)
+    c.setFont("Helvetica-Bold", 24)
+    name = contact_info.get("name", "YOUR NAME")
+    c.drawString(margin_left, y, name)
+    y -= 0.35 * inch
+
+    # Contact info (single line)
+    c.setFillColor(text_color)
+    c.setFont("Helvetica", 9)
+    contact_parts = []
+    if contact_info.get("email"):
+        contact_parts.append(contact_info["email"])
+    if contact_info.get("phone"):
+        contact_parts.append(contact_info["phone"])
+    if contact_info.get("linkedin"):
+        contact_parts.append(contact_info["linkedin"])
+    if contact_info.get("location"):
+        contact_parts.append(contact_info["location"])
+
+    if contact_parts:
+        contact_line = " | ".join(contact_parts)
+        c.drawString(margin_left, y, contact_line)
+        y -= 0.15 * inch
+
+    # Horizontal line separator
+    c.setStrokeColor(light_blue)
+    c.setLineWidth(1.5)
+    c.line(margin_left, y, margin_right, y)
+    y -= 0.3 * inch
+
+    # === SUMMARY (if available) ===
+    summary = parsed_resume.get("summary", "")
+    if summary:
+        c.setFillColor(dark_blue)
+        c.setFont("Helvetica-Bold", 11)
+        c.drawString(margin_left, y, "PROFESSIONAL SUMMARY")
+        y -= 0.2 * inch
+
+        c.setFillColor(text_color)
+        c.setFont("Helvetica", 9)
+        # Wrap summary text
+        wrapped = textwrap.fill(summary, width=100)
+        for line in wrapped.split('\n'):
+            c.drawString(margin_left + 0.1 * inch, y, line)
+            y -= 0.15 * inch
+        y -= 0.15 * inch
+
+    # === EXPERIENCE SECTION ===
+    c.setFillColor(dark_blue)
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(margin_left, y, "PROFESSIONAL EXPERIENCE")
+    y -= 0.25 * inch
+
+    # Get experience entries from parsed resume
+    experiences = parsed_resume.get("experience", [])
+
+    if experiences:
+        for exp in experiences:
+            # Check if we need a new page
+            if y < 2 * inch:
+                c.showPage()
+                y = height - 0.75 * inch
+
+            # Company/Title/Date
+            c.setFillColor(text_color)
+            c.setFont("Helvetica-Bold", 10)
+            title_line = exp.get("title", "")
+            if exp.get("company"):
+                title_line += f" - {exp['company']}"
+            c.drawString(margin_left + 0.1 * inch, y, title_line)
+
+            # Date (right-aligned)
+            if exp.get("date"):
+                c.setFont("Helvetica-Oblique", 9)
+                date_width = c.stringWidth(exp["date"], "Helvetica-Oblique", 9)
+                c.drawString(margin_right - date_width, y, exp["date"])
+
+            y -= 0.2 * inch
+
+            # Bullets for this job
+            job_bullets = exp.get("bullets", [])
+            c.setFont("Helvetica", 9)
+            for bullet in job_bullets:
+                if y < 1 * inch:
+                    c.showPage()
+                    y = height - 0.75 * inch
+
+                # Word wrap bullets
+                wrapped = textwrap.fill(bullet, width=95)
+                lines = wrapped.split('\n')
+                for i, line in enumerate(lines):
+                    if i == 0:
+                        c.drawString(margin_left + 0.2 * inch, y, f"• {line}")
+                    else:
+                        c.drawString(margin_left + 0.3 * inch, y, line)
+                    y -= 0.13 * inch
+                y -= 0.03 * inch
+
+            y -= 0.15 * inch
+    else:
+        # No structured experience, just use optimized bullets
+        c.setFont("Helvetica", 9)
+        c.setFillColor(text_color)
+        for bullet in optimized_bullets:
+            if y < 1 * inch:
+                c.showPage()
+                y = height - 0.75 * inch
+
+            # Word wrap
+            wrapped = textwrap.fill(bullet, width=95)
+            lines = wrapped.split('\n')
+            for i, line in enumerate(lines):
+                if i == 0:
+                    c.drawString(margin_left + 0.2 * inch, y, f"• {line}")
+                else:
+                    c.drawString(margin_left + 0.3 * inch, y, line)
+                y -= 0.13 * inch
+            y -= 0.03 * inch
+
+    # === PROJECTS ===
+    projects = parsed_resume.get("projects", [])
+    if projects:
+        if y < 2 * inch:
+            c.showPage()
+            y = height - 0.75 * inch
+
+        y -= 0.2 * inch
+        c.setFillColor(dark_blue)
+        c.setFont("Helvetica-Bold", 11)
+        c.drawString(margin_left, y, "PROJECTS")
+        y -= 0.25 * inch
+
+        for proj in projects:
+            # Check if we need a new page
+            if y < 2 * inch:
+                c.showPage()
+                y = height - 0.75 * inch
+
+            # Project name and tech stack
+            c.setFillColor(text_color)
+            c.setFont("Helvetica-Bold", 10)
+            project_line = proj.get("name", "")
+            if proj.get("tech_stack"):
+                project_line += f" | {proj['tech_stack']}"
+            c.drawString(margin_left + 0.1 * inch, y, project_line)
+            y -= 0.2 * inch
+
+            # Project bullets
+            proj_bullets = proj.get("bullets", [])
+            c.setFont("Helvetica", 9)
+            for bullet in proj_bullets:
+                if y < 1 * inch:
+                    c.showPage()
+                    y = height - 0.75 * inch
+
+                # Word wrap bullets
+                wrapped = textwrap.fill(bullet, width=95)
+                lines = wrapped.split('\n')
+                for i, line in enumerate(lines):
+                    if i == 0:
+                        c.drawString(margin_left + 0.2 * inch, y, f"• {line}")
+                    else:
+                        c.drawString(margin_left + 0.3 * inch, y, line)
+                    y -= 0.13 * inch
+                y -= 0.03 * inch
+
+            y -= 0.15 * inch
+
+    # === EDUCATION ===
+    education = parsed_resume.get("education", [])
+    if education:
+        if y < 2 * inch:
+            c.showPage()
+            y = height - 0.75 * inch
+
+        y -= 0.2 * inch
+        c.setFillColor(dark_blue)
+        c.setFont("Helvetica-Bold", 11)
+        c.drawString(margin_left, y, "EDUCATION")
+        y -= 0.2 * inch
+
+        c.setFillColor(text_color)
+        c.setFont("Helvetica", 9)
+        for edu in education:
+            if isinstance(edu, dict):
+                edu_line = edu.get("degree", "")
+                if edu.get("school"):
+                    edu_line += f" - {edu['school']}"
+                if edu.get("year"):
+                    c.setFont("Helvetica-Oblique", 9)
+                    year_width = c.stringWidth(edu["year"], "Helvetica-Oblique", 9)
+                    c.drawString(margin_right - year_width, y, edu["year"])
+                    c.setFont("Helvetica", 9)
+                c.drawString(margin_left + 0.1 * inch, y, edu_line)
+            else:
+                c.drawString(margin_left + 0.1 * inch, y, str(edu))
+            y -= 0.15 * inch
+
+    # === SKILLS ===
+    skills = parsed_resume.get("skills", {})
+    if skills:
+        if y < 2 * inch:
+            c.showPage()
+            y = height - 0.75 * inch
+
+        y -= 0.2 * inch
+        c.setFillColor(dark_blue)
+        c.setFont("Helvetica-Bold", 11)
+        c.drawString(margin_left, y, "SKILLS")
+        y -= 0.2 * inch
+
+        c.setFillColor(text_color)
+        c.setFont("Helvetica", 9)
+        for category, skill_list in skills.items():
+            if y < 1 * inch:
+                c.showPage()
+                y = height - 0.75 * inch
+
+            skill_text = f"{category}: {', '.join(skill_list) if isinstance(skill_list, list) else skill_list}"
+            wrapped = textwrap.fill(skill_text, width=95)
+            for line in wrapped.split('\n'):
+                c.drawString(margin_left + 0.1 * inch, y, line)
+                y -= 0.13 * inch
+            y -= 0.02 * inch
+
+    c.save()
+    buffer.seek(0)
+    return buffer.read()
 
 
 def generate_html_resume(

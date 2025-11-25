@@ -4,15 +4,21 @@ from firebase_admin import credentials, auth
 from fastapi import HTTPException, Security, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
+# LOCAL TESTING MODE - Set LOCAL_TESTING=true to skip Firebase auth
+LOCAL_TESTING = os.getenv("LOCAL_TESTING", "false").lower() == "true"
+
 # Initialize Firebase Admin
 # In Cloud Run, it auto-detects credentials. Locally, it needs GOOGLE_APPLICATION_CREDENTIALS env var.
-if not firebase_admin._apps:
+if not LOCAL_TESTING and not firebase_admin._apps:
     try:
         firebase_admin.initialize_app()
         print("✅ Firebase Admin initialized")
     except Exception as e:
         print(f"⚠️ Failed to initialize Firebase Admin: {e}")
-        print("Auth verification might fail if credentials are not set up.")
+        print("   Set LOCAL_TESTING=true to skip auth for testing")
+
+if LOCAL_TESTING:
+    print("⚠️  LOCAL_TESTING mode enabled - auth will be bypassed!")
 
 security = HTTPBearer()
 security_optional = HTTPBearer(auto_error=False)
@@ -20,7 +26,12 @@ security_optional = HTTPBearer(auto_error=False)
 def get_current_user(credentials: HTTPAuthorizationCredentials = Security(security)) -> str:
     """
     Verify Firebase ID token and return user_id.
+    In LOCAL_TESTING mode, accepts any token and returns test-user-123
     """
+    # LOCAL TESTING MODE - bypass auth
+    if LOCAL_TESTING:
+        return "test-user-123"
+
     token = credentials.credentials
     try:
         # Verify the token
