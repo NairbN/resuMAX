@@ -103,10 +103,20 @@ def extract_contact_info(text: str) -> ContactInfo:
     if github_match:
         contact.github = f"github.com/{github_match.group(1)}"
 
-    # Website (look for common TLDs)
+    # Website (look for common TLDs but exclude email domains, linkedin, github)
     website_match = re.search(r'\b([a-z0-9-]+\.(com|net|org|io|dev|info|tech))\b', text, re.IGNORECASE)
-    if website_match and website_match.group() not in [contact.email, contact.linkedin, contact.github]:
-        contact.website = website_match.group()
+    if website_match:
+        potential_website = website_match.group()
+        # Don't use if it's part of email, linkedin, or github
+        email_domain = contact.email.split('@')[1] if contact.email else None
+        if potential_website not in [email_domain, contact.linkedin, contact.github]:
+            # Make sure it's not just coincidentally matching part of linkedin/github
+            if contact.linkedin and potential_website in contact.linkedin:
+                pass  # Skip
+            elif contact.github and potential_website in contact.github:
+                pass  # Skip
+            else:
+                contact.website = potential_website
 
     return contact
 
@@ -346,17 +356,12 @@ def extract_skills(text: str) -> Dict[str, List[str]]:
 def extract_experience_entries(text: str) -> List[Dict[str, Any]]:
     """
     Extract structured experience entries with company, title, dates, and bullets.
-
-    Returns list of experience dicts:
-        [
-            {
-                "company": "OPEN SOURCE",
-                "title": "Software Engineer",
-                "date": "Sep 2025 – Nov 2025",
-                "location": "Remote",
-                "bullets": ["Built scalable...", "Developed..."]
-            }
-        ]
+    Handles various formats:
+    - Company | Location
+    - Title | Date
+    - Company    Location
+    - Title    Date
+    - Company (Location)
     """
     sections = parse_sections(text)
     experience_text = sections.get('experience', '')
@@ -369,6 +374,9 @@ def extract_experience_entries(text: str) -> List[Dict[str, Any]]:
     current_entry = None
     current_bullets = []
 
+    # Date pattern: Month Year - Month Year, Present, etc.
+    date_pattern = r'((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{4}.*?(?:Present|Current|Now|\d{4}))'
+    
     i = 0
     while i < len(lines):
         line = lines[i].strip()
@@ -377,8 +385,6 @@ def extract_experience_entries(text: str) -> List[Dict[str, Any]]:
             i += 1
             continue
 
-        # Check if this looks like a company/title line
-        # Usually in format: "COMPANY    Location" or "Title    Date"
         if not is_bullet_point(line):
             # Save previous entry
             if current_entry and current_bullets:
@@ -386,21 +392,76 @@ def extract_experience_entries(text: str) -> List[Dict[str, Any]]:
                 entries.append(current_entry)
 
             # Start new entry
-            # Try to parse company/location
-            parts = line.split('    ')  # Multiple spaces separate company/location
-            company = parts[0].strip()
-            location = parts[1].strip() if len(parts) > 1 else ""
+            # Strategy: 
+            # 1. First line is usually Company + Location (or Title + Date)
+            # 2. Second line is usually Title + Date (or Company + Location)
+            
+            # Helper to split line into left/right parts
+            def split_line(text_line):
+                # Try splitting by pipe or bullet char first
+                if '|' in text_line:
+                    parts = text_line.rsplit('|', 1)
+                    return parts[0].strip(), parts[1].strip()
+                if '•' in text_line:
+                    parts = text_line.rsplit('•', 1)
+                    return parts[0].strip(), parts[1].strip()
+                if '   ' in text_line:  # 3+ spaces
+                    parts = re.split(r'\s{3,}', text_line)
+                    if len(parts) >= 2:
+                        return parts[0].strip(), parts[-1].strip()
+                
+                # Check for date at end
+                date_match = re.search(date_pattern, text_line, re.IGNORECASE)
+                if date_match:
+                    date_str = date_match.group(1)
+                    # Make sure date is at the end
+                    if text_line.endswith(date_str):
+                        return text_line[:-len(date_str)].strip(' -|•,'), date_str
+                
+                # Check for common locations at end (Remote, City, State)
+                loc_pattern = r'\b(Remote|CA|NY|TX|WA|USA|United States|[A-Z][a-z]+,\s*[A-Z]{2})$'
+                loc_match = re.search(loc_pattern, text_line)
+                if loc_match:
+                     loc_str = loc_match.group(1)
+                     if text_line.endswith(loc_str):
+                         return text_line[:-len(loc_str)].strip(' -|•,'), loc_str
 
-            # Next line might be title and date
+                return text_line, ""
+
+            # Parse first line (Company/Location)
+            part1, part2 = split_line(line)
+            
+            # Guess if part1 is company or title based on keywords
+            # (Simple heuristic: Companies often capitalized, Titles have "Engineer", "Manager", etc.)
+            
+            company = part1
+            location = part2
             title = ""
             date = ""
+
+            # Check next line for Title/Date
             if i + 1 < len(lines):
                 next_line = lines[i + 1].strip()
                 if not is_bullet_point(next_line) and next_line:
-                    title_parts = next_line.split('    ')
-                    title = title_parts[0].strip()
-                    date = title_parts[1].strip() if len(title_parts) > 1 else ""
-                    i += 1  # Skip next line since we processed it
+                    n_part1, n_part2 = split_line(next_line)
+                    title = n_part1
+                    date = n_part2
+                    i += 1  # Consume next line
+
+            # Swap if it looks like Title came first
+            # Heuristic: Dates usually go with Title line
+            if re.search(date_pattern, location, re.IGNORECASE) and not date:
+                # First line had date, so it was probably Title | Date
+                # Second line is likely Company | Location
+                real_title = company
+                real_date = location
+                real_company = title
+                real_location = date
+                
+                company = real_company
+                location = real_location
+                title = real_title
+                date = real_date
 
             current_entry = {
                 "company": company,
@@ -431,15 +492,11 @@ def extract_experience_entries(text: str) -> List[Dict[str, Any]]:
 def extract_project_entries(text: str) -> List[Dict[str, Any]]:
     """
     Extract structured project entries.
-
-    Returns:
-        [
-            {
-                "name": "Video Platform",
-                "tech_stack": "TypeScript, React, Next.js, Node.js, Firebase, Docker, GCP",
-                "bullets": ["Built a fullstack...", "Implemented token based..."]
-            }
-        ]
+    Handles formats:
+    - Project Name | Tech Stack
+    - Project Name - Tech Stack
+    - Project Name (Tech Stack)
+    - Project Name
     """
     sections = parse_sections(text)
     projects_text = sections.get('projects', '')
@@ -460,21 +517,58 @@ def extract_project_entries(text: str) -> List[Dict[str, Any]]:
             i += 1
             continue
 
-        # Check if this is a project header (has tech stack with |)
-        if '|' in line and not is_bullet_point(line):
+        # Check if this is a project header
+        # Heuristic: Not a bullet, and either has separator OR is followed by bullets
+        is_header = False
+        
+        if not is_bullet_point(line):
+            # If it has a separator, it's definitely a header
+            if '|' in line or ' – ' in line or ' - ' in line:
+                is_header = True
+            # If it's just text and next line is a bullet, it's likely a header
+            elif i + 1 < len(lines) and is_bullet_point(lines[i+1]):
+                is_header = True
+            # If it's the very first line of the section, it's a header
+            elif current_entry is None and not is_bullet_point(line):
+                is_header = True
+
+        if is_header:
             # Save previous entry
             if current_entry and current_bullets:
                 current_entry['bullets'] = current_bullets
                 entries.append(current_entry)
 
-            # Parse project header: "Video Platform | TypeScript, React, Next.js..."
-            parts = line.split('|', 1)
-            name = parts[0].strip()
-            tech_stack = parts[1].strip() if len(parts) > 1 else ""
+            # Parse project header
+            name = line
+            tech_stack = ""
+            link = ""
+            
+            # Check for link at end
+            link_match = re.search(r'(\(link\)|\[link\]|http[s]?://\S+|www\.\S+)$', line, re.IGNORECASE)
+            if link_match:
+                link = link_match.group(1)
+                line = line[:-len(link)].strip()
+                name = line # Update name to exclude link
+            
+            # Try to split by common separators
+            for sep in ['|', ' – ', ' - ']:
+                if sep in line:
+                    parts = line.split(sep, 1)
+                    name = parts[0].strip()
+                    tech_stack = parts[1].strip()
+                    break
+            
+            # Handle parentheses: "Project Name (Tech Stack)"
+            if not tech_stack and '(' in name and name.endswith(')'):
+                match = re.search(r'(.*?)\s*\((.*?)\)$', name)
+                if match:
+                    name = match.group(1).strip()
+                    tech_stack = match.group(2).strip()
 
             current_entry = {
                 "name": name,
                 "tech_stack": tech_stack,
+                "link": link
             }
             current_bullets = []
 
@@ -499,16 +593,11 @@ def extract_project_entries(text: str) -> List[Dict[str, Any]]:
 def extract_education_entries(text: str) -> List[Dict[str, Any]]:
     """
     Extract structured education entries.
-
-    Returns:
-        [
-            {
-                "school": "UNIVERSITY OF CALIFORNIA, SAN DIEGO",
-                "degree": "B.S. in Mathematics-Computer Science",
-                "year": "Sep 2025",
-                "location": "La Jolla, CA"
-            }
-        ]
+    Handles formats:
+    - School | Location
+    - Degree | Date
+    - School    Location
+    - Degree    Date
     """
     sections = parse_sections(text)
     education_text = sections.get('education', '')
@@ -519,6 +608,42 @@ def extract_education_entries(text: str) -> List[Dict[str, Any]]:
     entries = []
     lines = education_text.split('\n')
 
+    # Date pattern: Month Year - Month Year, Present, etc.
+    # Also capture "Graduated" or "Expected" prefix
+    date_pattern = r'((?:Graduated|Expected|Est\.?)?\s*(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{4}.*?(?:Present|Current|Now|\d{4})?)'
+    
+    # Helper to split line
+    def split_line(text_line):
+        # Try splitting by pipe or bullet char first
+        if '|' in text_line:
+            parts = text_line.rsplit('|', 1)
+            return parts[0].strip(), parts[1].strip()
+        if '•' in text_line:
+            parts = text_line.rsplit('•', 1)
+            return parts[0].strip(), parts[1].strip()
+        if '   ' in text_line:  # 3+ spaces
+            parts = re.split(r'\s{3,}', text_line)
+            if len(parts) >= 2:
+                return parts[0].strip(), parts[-1].strip()
+        
+        # Check for date at end
+        date_match = re.search(date_pattern, text_line, re.IGNORECASE)
+        if date_match:
+            date_str = date_match.group(1)
+            if text_line.endswith(date_str):
+                return text_line[:-len(date_str)].strip(' -|•,'), date_str
+        
+        # Check for common locations at end
+        # Allow multiple words for city (e.g. "La Jolla, CA", "New York, NY")
+        loc_pattern = r'\b((?:[A-Z][a-z]+\s+)+[A-Z]{2}|(?:[A-Z][a-z]+\s*)+,\s*[A-Z]{2}|Remote|USA|United States)$'
+        loc_match = re.search(loc_pattern, text_line)
+        if loc_match:
+                loc_str = loc_match.group(0) # Use group 0 to get full match
+                if text_line.endswith(loc_str):
+                    return text_line[:-len(loc_str)].strip(' -|•,'), loc_str
+
+        return text_line, ""
+
     i = 0
     while i < len(lines):
         line = lines[i].strip()
@@ -528,9 +653,7 @@ def extract_education_entries(text: str) -> List[Dict[str, Any]]:
             continue
 
         # School line (usually has location at end)
-        parts = line.split('    ')
-        school = parts[0].strip()
-        location = parts[1].strip() if len(parts) > 1 else ""
+        school, location = split_line(line)
 
         # Next line is degree and date
         degree = ""
@@ -538,9 +661,7 @@ def extract_education_entries(text: str) -> List[Dict[str, Any]]:
         if i + 1 < len(lines):
             next_line = lines[i + 1].strip()
             if next_line:
-                degree_parts = next_line.split('    ')
-                degree = degree_parts[0].strip()
-                year = degree_parts[1].strip() if len(degree_parts) > 1 else ""
+                degree, year = split_line(next_line)
                 i += 1
 
         entries.append({

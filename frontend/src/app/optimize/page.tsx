@@ -267,7 +267,8 @@ export default function OptimizePage() {
                     }
                   }
 
-                  const downloadUrl = `http://localhost:8080/download-resume/${selectedResumeId}?version=optimized`;
+                  const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+                  const downloadUrl = `${API_BASE}/download-resume/${selectedResumeId}?version=optimized`;
                   const response = await fetch(downloadUrl, { headers });
 
                   if (!response.ok) {

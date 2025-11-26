@@ -113,30 +113,46 @@ def optimize_resume(
     # Reorder bullets within each experience entry
     experiences = parsed_resume.get("experience", [])
     if experiences:
-        for exp in experiences:
+        print(f"\n📝 Reordering bullets in {len(experiences)} experience entries...")
+        for exp_idx, exp in enumerate(experiences):
             exp_bullets = exp.get("bullets", [])
             if exp_bullets:
+                print(f"\n  Experience {exp_idx + 1}: {exp.get('title', 'Unknown')} at {exp.get('company', 'Unknown')}")
+                print(f"    Original bullet count: {len(exp_bullets)}")
+                print(f"    First bullet before: {exp_bullets[0][:80]}...")
+                
                 # Sort this job's bullets by relevance score
-                exp["bullets"] = sorted(
+                sorted_bullets = sorted(
                     exp_bullets,
                     key=lambda b: bullet_ranks.get(b, 0),
                     reverse=True
                 )
+                exp["bullets"] = sorted_bullets
+                
+                print(f"    First bullet after:  {sorted_bullets[0][:80]}...")
+                print(f"    Scores: {[round(bullet_ranks.get(b, 0) * 100, 1) for b in sorted_bullets[:3]]}")
         # Update parsed resume with reordered bullets
         parsed_resume["experience"] = experiences
 
     # Reorder bullets within each project entry
     projects = parsed_resume.get("projects", [])
     if projects:
-        for proj in projects:
+        print(f"\n📝 Reordering bullets in {len(projects)} project entries...")
+        for proj_idx, proj in enumerate(projects):
             proj_bullets = proj.get("bullets", [])
             if proj_bullets:
+                print(f"\n  Project {proj_idx + 1}: {proj.get('name', 'Unknown')}")
+                print(f"    Original bullet count: {len(proj_bullets)}")
+                
                 # Sort this project's bullets by relevance score
-                proj["bullets"] = sorted(
+                sorted_bullets = sorted(
                     proj_bullets,
                     key=lambda b: bullet_ranks.get(b, 0),
                     reverse=True
                 )
+                proj["bullets"] = sorted_bullets
+                
+                print(f"    Scores: {[round(bullet_ranks.get(b, 0) * 100, 1) for b in sorted_bullets[:3]]}")
         # Update parsed resume with reordered bullets
         parsed_resume["projects"] = projects
 

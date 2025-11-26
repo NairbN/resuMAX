@@ -99,6 +99,7 @@ class ResumeNormalizer:
             normalized_projects.append({
                 "name": proj.get("name", ""),
                 "tech_stack": proj.get("tech_stack", ""),
+                "link": proj.get("link", ""),
                 "bullets": bullets_with_scores
             })
 
@@ -164,31 +165,42 @@ class TemplateRenderer:
         .section-header {
             font-size: 10.5pt;
             font-weight: bold;
-            margin-top: 0.12in;
-            margin-bottom: 0.08in;
+            margin-top: {{ section_margin_top }};
+            margin-bottom: {{ section_margin_bottom }};
+            border-bottom: 1pt solid #000;
+            padding-bottom: 0.02in;
         }
 
         /* Experience/Project entries */
         .entry {
-            margin-bottom: 0.1in;
+            margin-bottom: {{ entry_margin_bottom }};
+            page-break-inside: avoid;
         }
 
         .entry-header {
             display: flex;
             justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 0.02in;
+        }
+
+        .entry-left {
             font-size: 9pt;
             font-weight: bold;
-            margin-bottom: 0.05in;
+            flex: 0 1 auto;
         }
 
-        .entry-title {
-            flex: 1;
-        }
-
-        .entry-date {
+        .entry-right {
+            font-size: 9pt;
             font-style: italic;
-            font-weight: normal;
+            text-align: right;
             white-space: nowrap;
+            flex: 0 0 auto;
+            margin-left: auto;
+        }
+        
+        .entry .entry-header:last-of-type {
+            margin-bottom: 0.05in;
         }
 
         /* Bullets - compact */
@@ -238,14 +250,28 @@ class TemplateRenderer:
         <div class="contact">{{ contact_line }}</div>
     </div>
 
+    <!-- SKILLS -->
+    {% if skills %}
+    <div class="section-header">SKILLS</div>
+    {% for category, skill_list in skills.items() %}
+    <div class="skill-category">
+        <strong>{{ category }}:</strong> {{ skill_list|join(', ') if skill_list is iterable and skill_list is not string else skill_list }}
+    </div>
+    {% endfor %}
+    {% endif %}
+
     <!-- EXPERIENCE -->
     {% if experience %}
     <div class="section-header">EXPERIENCE</div>
     {% for exp in experience %}
     <div class="entry">
         <div class="entry-header">
-            <div class="entry-title">{{ exp.title }}{% if exp.company %} - {{ exp.company }}{% endif %}{% if exp.location %}, {{ exp.location }}{% endif %}</div>
-            <div class="entry-date">{{ exp.date }}</div>
+            <div class="entry-left">{{ exp.company }}</div>
+            <div class="entry-right">{{ exp.location }}</div>
+        </div>
+        <div class="entry-header">
+            <div class="entry-left">{{ exp.title }}</div>
+            <div class="entry-right">{{ exp.date }}</div>
         </div>
         <ul class="bullets">
             {% for bullet in exp.bullets %}
@@ -262,7 +288,16 @@ class TemplateRenderer:
     {% for proj in projects %}
     <div class="entry">
         <div class="entry-header">
-            <div class="entry-title">{{ proj.name }}{% if proj.tech_stack %} | {{ proj.tech_stack }}{% endif %}</div>
+            <div class="entry-left">{{ proj.name }}{% if proj.tech_stack %} | {{ proj.tech_stack }}{% endif %}</div>
+            <div class="entry-right">
+                {% if proj.link %}
+                    {% if proj.link.startswith('http') %}
+                    <a href="{{ proj.link }}" style="color: #0066cc; text-decoration: none;">(Link)</a>
+                    {% else %}
+                    <span style="color: #0066cc;">{{ proj.link }}</span>
+                    {% endif %}
+                {% endif %}
+            </div>
         </div>
         <ul class="bullets">
             {% for bullet in proj.bullets %}
@@ -278,21 +313,14 @@ class TemplateRenderer:
     <div class="section-header">EDUCATION</div>
     {% for edu in education %}
     <div class="education-entry">
-        <div class="education-header">
-            <div>{{ edu.school }}{% if edu.location %}, {{ edu.location }}{% endif %}</div>
-            <div class="entry-date">{{ edu.year }}</div>
+        <div class="entry-header">
+            <div class="entry-left">{{ edu.school }}</div>
+            <div class="entry-right">{{ edu.location }}</div>
         </div>
-        <div class="education-degree">{{ edu.degree }}</div>
-    </div>
-    {% endfor %}
-    {% endif %}
-
-    <!-- SKILLS -->
-    {% if skills %}
-    <div class="section-header">SKILLS</div>
-    {% for category, skill_list in skills.items() %}
-    <div class="skill-category">
-        <strong>{{ category }}:</strong> {{ skill_list|join(', ') if skill_list is iterable and skill_list is not string else skill_list }}
+        <div class="entry-header">
+            <div class="entry-left">{{ edu.degree }}</div>
+            <div class="entry-right">{{ edu.year }}</div>
+        </div>
     </div>
     {% endfor %}
     {% endif %}
@@ -304,12 +332,52 @@ class TemplateRenderer:
         """Generate HTML from normalized data."""
         from jinja2 import Template
 
-        # Build contact line
+        # Determine spacing based on mode
+        spacing_mode = data.get('_spacing_mode', 'balanced')
+        if spacing_mode == 'balanced':
+            # More generous spacing to fill the page
+            section_margin_top = '0.2in'
+            section_margin_bottom = '0.12in'
+            entry_margin_bottom = '0.2in'
+        else:
+            # Compact spacing
+            section_margin_top = '0.12in'
+            section_margin_bottom = '0.08in'
+            entry_margin_bottom = '0.1in'
+
+        # Build contact line - deduplicate and format properly
         contact = data.get("contact", {})
         contact_parts = []
-        for field in ["email", "phone", "github", "website", "linkedin"]:
-            if contact.get(field):
-                contact_parts.append(contact[field])
+        seen = set()
+        
+        # Add contact info in order, avoiding duplicates
+        if contact.get("email") and contact.get("email") not in seen:
+            contact_parts.append(contact.get("email"))
+            seen.add(contact.get("email"))
+        
+        if contact.get("phone") and contact.get("phone") not in seen:
+            contact_parts.append(contact.get("phone"))
+            seen.add(contact.get("phone"))
+        
+        if contact.get("website") and contact.get("website") not in seen:
+            # Only add if not already part of email/linkedin/github
+            website = contact.get("website")
+            if not any(website in str(v) for v in seen):
+                contact_parts.append(website)
+                seen.add(website)
+        
+        if contact.get("linkedin") and contact.get("linkedin") not in seen:
+            linkedin = contact.get("linkedin")
+            if not any(linkedin in str(v) for v in seen):
+                contact_parts.append(linkedin)
+                seen.add(linkedin)
+        
+        if contact.get("github") and contact.get("github") not in seen:
+            github = contact.get("github")
+            if not any(github in str(v) for v in seen):
+                contact_parts.append(github)
+                seen.add(github)
+        
         contact_line = " | ".join(contact_parts)
 
         # Render template
@@ -320,7 +388,10 @@ class TemplateRenderer:
             experience=data.get("experience", []),
             projects=data.get("projects", []),
             education=data.get("education", []),
-            skills=data.get("skills", {})
+            skills=data.get("skills", {}),
+            section_margin_top=section_margin_top,
+            section_margin_bottom=section_margin_bottom,
+            entry_margin_bottom=entry_margin_bottom
         )
 
 
@@ -346,6 +417,7 @@ class OverflowManager:
     def fit_to_one_page(self, normalized_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Remove bullets until resume fits on exactly 1 page.
+        Then adjust spacing to fill the page evenly.
 
         Returns the trimmed data that fits.
         """
@@ -362,15 +434,19 @@ class OverflowManager:
 
             if page_count <= 1:
                 print(f"  ✅ Fits on 1 page!")
+                # Now adjust spacing to fill the page better
+                normalized_data['_spacing_mode'] = 'balanced'
                 return normalized_data
 
             # Find and remove lowest-scored bullet
             if not self._remove_lowest_bullet(normalized_data):
                 # No more bullets to remove
                 print(f"  ⚠️  Warning: Cannot fit on 1 page even after removing all bullets")
+                normalized_data['_spacing_mode'] = 'compact'
                 return normalized_data
 
         print(f"  ⚠️  Warning: Reached max iterations ({max_iterations})")
+        normalized_data['_spacing_mode'] = 'compact'
         return normalized_data
 
     def _count_pages(self, html: str) -> int:

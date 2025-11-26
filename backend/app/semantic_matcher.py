@@ -355,6 +355,50 @@ class SemanticMatcher:
         }
 
 
+    def extract_keywords(self, text: str, top_n: int = 20) -> List[str]:
+        """
+        Extract top keywords from text using TF-IDF.
+        
+        Args:
+            text: Input text (job description)
+            top_n: Number of keywords to return
+            
+        Returns:
+            List of top keywords
+        """
+        from sklearn.feature_extraction.text import TfidfVectorizer
+        from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
+        
+        # Custom stop words for resumes
+        custom_stop_words = list(ENGLISH_STOP_WORDS) + [
+            'experience', 'work', 'job', 'role', 'team', 'company', 'years',
+            'skills', 'knowledge', 'understanding', 'proficiency', 'ability',
+            'strong', 'excellent', 'good', 'proven', 'track', 'record',
+            'responsible', 'duties', 'responsibilities', 'qualifications',
+            'requirements', 'preferred', 'plus', 'nice', 'have', 'looking',
+            'seeking', 'candidate', 'position', 'location', 'remote', 'hybrid'
+        ]
+        
+        try:
+            vectorizer = TfidfVectorizer(
+                max_features=top_n,
+                stop_words=custom_stop_words,
+                ngram_range=(1, 2)  # Unigrams and bigrams
+            )
+            
+            # Fit on the text
+            vectorizer.fit_transform([text])
+            
+            # Get feature names (keywords)
+            keywords = vectorizer.get_feature_names_out()
+            
+            return list(keywords)
+            
+        except Exception as e:
+            print(f"Error extracting keywords: {e}")
+            return []
+
+
 # Singleton instance (load model once)
 _matcher_instance = None
 

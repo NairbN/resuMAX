@@ -46,7 +46,7 @@ export function useDashboardData(userId?: string) {
         return;
       }
       try {
-        const resumes = await listResumes(userId);
+        const resumes = await listResumes();
         if (!cancelled) {
           setData(mapFromResumes(resumes));
         }
