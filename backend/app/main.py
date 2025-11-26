@@ -5,13 +5,12 @@ from pydantic import BaseModel
 import os
 from typing import Optional
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
-# Import our processing modules (we'll create these)
+# Import our processing modules
 from app.resume_parser import parse_resume
 from app.job_parser import parse_job_description
 from app.optimizer import optimize_resume
-from app.storage import upload_to_gcs, download_from_gcs
 from app.storage import upload_to_gcs, download_from_gcs
 from app.database import save_resume_metadata, get_resume_metadata
 from app.auth import get_current_user
@@ -24,7 +23,7 @@ async def startup_event():
     """Pre-load heavy models on startup"""
     print("🚀 Loading semantic matching model...")
     from app.semantic_matcher import get_semantic_matcher
-    matcher = get_semantic_matcher()
+    get_semantic_matcher()  # Pre-load the model
     print("✅ Model loaded and ready!")
 
 # CORS - allow your frontend to call this API
@@ -104,7 +103,7 @@ async def upload_resume(
             "resumeId": resume_id,
             "originalFile": gcs_path,
             "originalFileName": file.filename,
-            "uploadedAt": datetime.utcnow().isoformat(),
+            "uploadedAt": datetime.now(timezone.utc).isoformat(),
             "bulletCount": len(parsed_data.get("bullets", [])),
             "contactEmail": parsed_data.get("contact_info", {}).get("email", "")
         }
@@ -189,7 +188,7 @@ async def process_job_description(
             "jobDescription": request.job_description,
             "jobTitle": request.job_title,
             "company": request.company,
-            "optimizedAt": datetime.utcnow().isoformat(),
+            "optimizedAt": datetime.now(timezone.utc).isoformat(),
             "status": "optimized",
             "relevanceScore": scores.get("overall_score", 0)
         })
