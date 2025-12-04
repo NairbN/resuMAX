@@ -48,6 +48,7 @@ backend/uploads/
 backend/temp/
 backend/*.pdf
 backend/*.docx
+backend/secrets/firebase-credentials.json
 
 # Node
 node_modules/
