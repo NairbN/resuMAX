@@ -1,0 +1,16 @@
+[tool.black]
+line-length = 100
+target-version = ["py311", "py312", "py313", "py314"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["apps/api"]
+extend-select = ["I"]  # import sorting
+fix = true
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
