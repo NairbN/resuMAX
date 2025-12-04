@@ -20,16 +20,20 @@
 - Optional (future infra): Docker Desktop with compose for Postgres/Redis/MinIO/mail catcher
 
 ## 4. Repository Structure Overview
-- apps/frontend - Next.js UI (upload, JD intake, optimize, versions, exports)
-- apps/api - FastAPI REST API (auth, presign, optimize orchestration, health)
-- apps/worker - queue workers (placeholder; not yet configured locally)
-- packages/ui - design system tokens/components (placeholder)
-- packages/shared - shared contracts/clients/constants (placeholder)
-- packages/prompt-lib - prompt templates, AI adapters, mock provider fixtures (placeholder)
-- infra/docker - docker-compose for local infra (not used yet here)
-- infra/migrations - DB migrations (placeholder)
-- tests/e2e, tests/contracts - test harnesses (placeholder)
-- docs - reference docs (architecture, UX, backlog, setup)
+- apps/frontend - Next.js 14 App Router UI (upload, JD intake, optimize, versions, exports).
+- apps/api - FastAPI REST API (auth, presign, optimize orchestration, health).
+- apps/worker - Queue workers for parse/AI/export/email (placeholder; shares code with API).
+- packages/ui - Design system tokens/components (placeholder).
+- packages/shared - Shared contracts/clients/constants (placeholder).
+- packages/prompt-lib - Prompt templates, AI adapters, schema validators, mock provider fixtures (placeholder).
+- infra/docker - Docker-compose for local infra (Postgres, Redis/SQS, MinIO/mail catcher).
+- infra/migrations - Alembic migrations and seeds.
+- tests/e2e - Playwright/Cypress E2E suites (mock AI default).
+- tests/contracts - API contract/integration tests and fixtures.
+- docs - Reference docs (architecture, UX, backlog, setup, file structure).
+- scripts - Helper scripts for dev/CI when added.
+
+See docs/resuMAX_file_structure.md for detailed layout and per-role guidance.
 
 ## 5. Local Environment Setup (current lightweight flow)
 1) Clone or open the repo folder.
@@ -100,6 +104,7 @@ Checks:
 - docs/resuMAX_system_architecture.md
 - docs/resuMAX_project_index.md
 - docs/resuMAX_dev_setup.md (this file)
+- docs/resuMAX_file_structure.md
 - docs/resuMAX_UI_design_system.md
 - docs/resuMAX_UX_UI_design_spec.md
 - docs/resuMAX-ux-flows.md

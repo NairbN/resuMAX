@@ -2,6 +2,7 @@
 
 ## 1. Purpose
 Maps each logical component in resuMAX to the implementation stack, runtime placement, and integration contracts so delivery teams can trace requirements to code and infrastructure.
+Code locations: Next.js UI lives in `apps/frontend`, FastAPI API in `apps/api`, workers in `apps/worker`, and shared libraries in `packages/ui`, `packages/shared`, and `packages/prompt-lib`. See docs/resuMAX_file_structure.md for full layout.
 
 ## 2. Component-to-Implementation Matrix
 | Component | Implementation | Key Dependencies | Notes |

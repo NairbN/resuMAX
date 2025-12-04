@@ -1,0 +1,1 @@
+Shared contracts, generated API clients, and cross-cutting constants/helpers for frontend and backend code. Add package scaffolding and generated artifacts here (e.g., OpenAPI TS client, shared validation utilities).

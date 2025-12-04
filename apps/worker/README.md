@@ -1,0 +1,1 @@
+Queue-backed workers for parsing, AI orchestration, exports, and email/notifications. This runtime should import shared modules from apps/api (task definitions, clients, prompt-lib). Add the worker entrypoint and task wiring here.

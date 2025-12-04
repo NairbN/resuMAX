@@ -25,12 +25,13 @@
 - Data/resiliency: simulate network interruption, retry flows, token refresh, signed URL expiry, queue retry visibility; verify idempotency on optimize/export.
 
 ## 4. Test Environment
-- Local: Next.js + NestJS with Docker (PostgreSQL, Redis/MinIO); mock AI provider; seeded users (verified/unverified, credit states, admin) and sample resumes/JDs.
+- Local: Next.js + FastAPI with Docker (PostgreSQL, Redis/MinIO); mock AI provider; seeded users (verified/unverified, credit states, admin) and sample resumes/JDs.
 - Staging: Prod-parity topology with sandbox AI keys, email service enabled (verification/reset), signed URLs to staging storage, TLS, feature flags toggleable (credits gate, fallback provider, checklist), observability dashboards and logs accessible.
 - Pre-prod (if used): Same as staging with production-like data retention and real AI keys for final verification; restricted access.
 - Test accounts & data: at least one verified user, one unverified, zero-credit user, credit-sufficient user, admin; seeds for resumes/JDs/versions; tokens for password reset/verification tests.
 - Configuration/flags: credits on/off, fallback AI provider, mock AI enablement, checklist enablement, email verification enforcement, export formats enabled, SSE/websocket status updates.
 - External dependencies: AI providers (OpenAI/Anthropic), object storage (S3/MinIO), queue (Redis/SQS), email service, optional payment processor; ensure sandbox keys and TTLs configured.
+- Test code locations: frontend tests in `apps/frontend/tests/*`, backend tests in `apps/api/tests/*`, worker tests in `apps/worker/tests`, E2E suites in `tests/e2e`, API contract tests in `tests/contracts`, shared fixtures in `tests/fixtures` (see docs/resuMAX_file_structure.md).
 
 ## 5. Key User Journeys to Validate
 - New user sign-up and initial login: ensures verification gating, checklist visibility, secure session start.
