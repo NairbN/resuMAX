@@ -1,12 +1,21 @@
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 
-export const Logo = ({ className, ...props }: React.ComponentProps<"img">) => {
+type LogoProps = {
+  className?: string;
+  size?: number;
+};
+
+export const Logo = ({ className, size = 28 }: LogoProps) => {
   return (
-    <img
-      src="/images/android-chrome-192x192.png"
-      alt="logo"
-      className={cn("size-7", className)}
-      {...props}
+    <Image
+      src="/logo.svg"
+      alt="ResuMAX logo"
+      width={size}
+      height={size}
+      className={cn(className)}
+      style={{ width: `${size}px`, height: "auto", objectFit: "contain" }}
+      priority
     />
   );
 };

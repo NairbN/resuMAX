@@ -25,7 +25,13 @@ const formSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters long"),
 });
 
-const Login = () => {
+type LoginProps = {
+  variant?: "page" | "modal";
+  onSuccess?: () => void;
+  onSwitchMode?: (mode: "login" | "signup") => void;
+};
+
+const Login = ({ variant = "page", onSuccess, onSwitchMode }: LoginProps) => {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const { status, error, errorStatus, needsVerification } = useAppSelector(
@@ -47,31 +53,46 @@ const Login = () => {
     resolver: zodResolver(formSchema),
   });
 
+  const containerClasses =
+    variant === "modal"
+      ? "flex items-center justify-center bg-transparent"
+      : "min-h-screen flex items-center justify-center bg-muted/70";
+
+  const cardClasses =
+    variant === "modal"
+      ? "relative max-w-sm w-full rounded-xl px-8 py-8 overflow-hidden border border-transparent shadow-none bg-transparent"
+      : "relative max-w-sm w-full border rounded-xl px-8 py-8 shadow-lg/5 dark:shadow-xl bg-card overflow-hidden";
+
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     try {
       const result = await dispatch(login(data)).unwrap();
       if (result?.needsVerification) {
         // Allow navigation; downstream can show verification banner
       }
-      router.push("/dashboard");
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        router.push("/dashboard");
+      }
     } catch (err) {
       // error is handled via slice state
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/70">
-      <div className="relative max-w-sm w-full border rounded-xl px-8 py-8 shadow-lg/5 dark:shadow-xl bg-card overflow-hidden">
-        <div
-          className="absolute inset-0 z-0 -top-px -left-px"
-          style={{
-            backgroundImage: `
+    <div className={containerClasses}>
+      <div className={cardClasses}>
+        {variant !== "modal" && (
+          <div
+            className="absolute inset-0 z-0 -top-px -left-px"
+            style={{
+              backgroundImage: `
         linear-gradient(to right, color-mix(in srgb, var(--card-foreground) 8%, transparent) 1px, transparent 1px),
         linear-gradient(to bottom, color-mix(in srgb, var(--card-foreground) 8%, transparent) 1px, transparent 1px)
       `,
-            backgroundSize: "20px 20px",
-            backgroundPosition: "0 0, 0 0",
-            maskImage: `
+              backgroundSize: "20px 20px",
+              backgroundPosition: "0 0, 0 0",
+              maskImage: `
         repeating-linear-gradient(
               to right,
               black 0px,
@@ -88,7 +109,7 @@ const Login = () => {
             ),
             radial-gradient(ellipse 70% 50% at 50% 0%, #000 60%, transparent 100%)
       `,
-            WebkitMaskImage: `
+              WebkitMaskImage: `
  repeating-linear-gradient(
               to right,
               black 0px,
@@ -105,16 +126,14 @@ const Login = () => {
             ),
             radial-gradient(ellipse 70% 50% at 50% 0%, #000 60%, transparent 100%)
       `,
-            maskComposite: "intersect",
-            WebkitMaskComposite: "source-in",
-          }}
-        />
+              maskComposite: "intersect",
+              WebkitMaskComposite: "source-in",
+            }}
+          />
+        )}
 
         <div className="relative isolate flex flex-col items-center">
-          <Logo className="h-9 w-9" />
-          <p className="mt-4 text-xl font-semibold tracking-tight">
-            Log in to Shadcn UI Blocks
-          </p>
+          <Logo size={320} />
 
           <Button className="mt-8 w-full gap-3">
             <GoogleLogo />
@@ -193,9 +212,15 @@ const Login = () => {
             </Link>
             <p className="text-sm text-center">
               Don&apos;t have an account?
-              <Link href="/register" className="ml-1 underline text-muted-foreground">
+              <button
+                type="button"
+                onClick={() =>
+                  onSwitchMode ? onSwitchMode("signup") : router.push("/")
+                }
+                className="ml-1 underline text-muted-foreground"
+              >
                 Create account
-              </Link>
+              </button>
             </p>
           </div>
         </div>

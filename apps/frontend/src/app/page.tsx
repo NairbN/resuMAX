@@ -1,84 +1,88 @@
-import tailwindcss from 'tailwindcss';
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
+import AuthModal from "@/features/auth/components/auth-modal";
+import AuthCtaButtons from "@/features/auth/components/auth-cta-buttons";
+import { Logo } from "@/components/logo";
+import MockControls from "@/features/auth/components/mock-controls";
+
+type ModalMode = "login" | "signup" | null;
+
 export default function Home() {
+  const [mode, setMode] = useState<ModalMode>(null);
+  const [scrollY, setScrollY] = useState(0);
+  const isMock = process.env.NEXT_PUBLIC_USE_AUTH_MOCK === "true";
+  const [mockOpen, setMockOpen] = useState(false);
+
+  const closeModal = () => setMode(null);
+
+  useEffect(() => {
+    const onScroll = () => setScrollY(window.scrollY || 0);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  const { mainOpacity, cornerOpacity } = useMemo(() => {
+    const main = Math.max(0, Math.min(1, 1 - scrollY / 200));
+    const corner = Math.max(0, Math.min(1, (scrollY - 80) / 200));
+    return { mainOpacity: main, cornerOpacity: corner };
+  }, [scrollY]);
+
   return (
-    <div className="min-h-screen w-full grid grid-cols-2">
-      {/* LEFT: Auth panel */}
-      <div className="flex flex-col justify-center px-8 py-12 md:px-16 bg-white">
-        <div className="max-w-md w-full mx-auto">
-          {/* Logo / Title */}
-          <h1 className="text-3xl font-bold mb-2">Welcome back</h1>
-          <p className="text-gray-500 mb-8">
-            Sign in to continue to your dashboard.
-          </p>
-
-          {/* Form */}
-          <form className="space-y-6">
-            <div>
-              <label
-                htmlFor="email"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="you@example.com"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="••••••••"
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="w-full py-2.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition"
-            >
-              Sign In
-            </button>
-          </form>
-
-          {/* Small text */}
-          <p className="mt-6 text-sm text-gray-500 text-center">
-            Don&apos;t have an account?{" "}
-            <button className="text-blue-600 hover:underline">
-              Sign up
-            </button>
-          </p>
+    <div className="relative min-h-[200vh] bg-gradient-to-br from-slate-50 via-white to-slate-100 text-slate-900 dark:from-slate-800 dark:via-slate-900 dark:to-slate-950 dark:text-white">
+      <div className="fixed right-4 top-4 flex items-center gap-3 z-20">
+        <div
+          className="flex gap-2 transition-opacity duration-200"
+          style={{
+            opacity: cornerOpacity,
+            pointerEvents: cornerOpacity > 0.05 ? "auto" : "none",
+          }}
+        >
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setMode("login")}
+            className="bg-transparent border border-slate-300 text-slate-900 hover:bg-slate-100 hover:text-slate-900 dark:border-white/60 dark:text-white dark:hover:bg-white/10 dark:hover:text-white"
+          >
+            Log in
+          </Button>
+          <Button
+            size="sm"
+            variant="default"
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
+            onClick={() => setMode("signup")}
+          >
+            Sign Up
+          </Button>
         </div>
       </div>
-
-      {/* RIGHT: Hero panel */}
-      <div className="md:flex flex-col justify-center px-12 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 text-white">
-        <div className="max-w-md">
-          <h2 className="text-4xl font-bold mb-4">
-            A clean place for your events.
-          </h2>
-          <p className="text-indigo-100 mb-6">
-            Track countdowns, stay on top of deadlines, and never miss an
-            important moment again.
-          </p>
-
-          <ul className="space-y-2 text-sm text-indigo-100">
-            <li>• Minimal, distraction-free interface</li>
-            <li>• Smart reminders for upcoming events</li>
-            <li>• Works across desktop and mobile</li>
-          </ul>
+      <div className="absolute inset-0 pointer-events-none" />
+      <header className="mx-auto max-w-5xl px-6 py-16 text-center">
+        <div className="mx-auto max-w-lg rounded-2xl border border-white/10 bg-white/10 dark:border-white/15 dark:bg-white/5 p-10 shadow-2xl backdrop-blur-sm">
+          <div className="flex items-center justify-center py-6">
+            <Logo size={320} className="drop-shadow-lg w-full h-auto" />
+          </div>
         </div>
-      </div>
+        <AuthCtaButtons
+          onLogin={() => setMode("login")}
+          onSignup={() => setMode("signup")}
+          style={{
+            opacity: mainOpacity,
+            pointerEvents: mainOpacity > 0.05 ? "auto" : "none",
+            transition: "opacity 200ms ease-in-out",
+          }}
+        />
+      </header>
+
+      <AuthModal
+        open={mode !== null}
+        mode={mode ?? "login"}
+        onClose={closeModal}
+        onSwitchMode={(next) => setMode(next)}
+      />
+      {isMock && <MockControls open={mockOpen} onClose={() => setMockOpen(false)} />}
     </div>
   );
 }

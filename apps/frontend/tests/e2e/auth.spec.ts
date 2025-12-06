@@ -2,7 +2,8 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Auth flow (mock mode)', () => {
   test('login redirects to dashboard and shows verification gate', async ({ page }) => {
-    await page.goto('/login');
+    await page.goto('/');
+    await page.getByRole('button', { name: /log in/i }).click();
 
     await page.getByLabel(/email/i).fill('mockuser@example.com');
     await page.getByLabel(/^password$/i).fill('password123');
@@ -14,7 +15,8 @@ test.describe('Auth flow (mock mode)', () => {
   });
 
   test('signup enforces matching passwords and reaches dashboard', async ({ page }) => {
-    await page.goto('/register');
+    await page.goto('/');
+    await page.getByRole('button', { name: /sign up/i }).click();
 
     await page.getByLabel(/email/i).fill('newuser@example.com');
     await page.getByLabel(/^password$/i).fill('password123');

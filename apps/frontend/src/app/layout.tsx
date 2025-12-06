@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import "./globals.css";
+import "../styles/globals.css";
 import Providers from "./providers";
+import TopLeftControls from "@/components/top-left-controls";
 
 export const metadata: Metadata = {
   title: "ResuMAX - Your AI Resume Assistant",
@@ -15,7 +16,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <Providers>{children}</Providers>
+        <Providers>
+          <TopLeftControls />
+          {children}
+        </Providers>
       </body>
     </html>
   );

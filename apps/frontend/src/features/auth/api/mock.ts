@@ -39,6 +39,10 @@ export async function signup(payload: Credentials): Promise<AuthResponse> {
   return authResponse();
 }
 
+export function setMockVerification(verified: boolean) {
+  mockUser.verified = verified;
+}
+
 export async function login(payload: Credentials): Promise<AuthResponse> {
   await sleep();
 

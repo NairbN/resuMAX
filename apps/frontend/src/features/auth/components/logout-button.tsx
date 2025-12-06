@@ -27,7 +27,7 @@ const LogoutButton = ({
     setPending(true);
     try {
       await dispatch(logout()).unwrap();
-      router.push("/login");
+      router.push("/");
     } finally {
       setPending(false);
     }
