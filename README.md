@@ -1,51 +1,59 @@
 # resuMAX
 
-## Local Development
+## Local Development (scripts)
 
 ### Prereqs
+- Python 3.10+ (venv is auto-created by scripts)
+- Node 18+ with pnpm
+- Docker (for Postgres/Redis when using `make dev` or compose)
 
-- Node 18+ (using v22.21.0)
-- Python 3.10+ (using 3.14.0)
-- pnpm
-- git, VS Code
+### Quick start (backend + frontend + db/redis)
+```
+make setup          # install backend/frontend deps
+make dev            # starts dockerized db/redis, backend (uvicorn --reload), frontend (next dev)
+```
+- Ctrl+C stops backend/frontend and brings down db/redis.
+- Backend env regenerates each run with a fresh `AUTH_SECRET`; frontend `.env.local` is regenerated and mock is off for `make dev`.
 
-### Backend (FastAPI)
+### Run individually (scripts/Make targets)
+- Backend only (regens .env, uses Postgres if available else sqlite): `make backend`
+- Frontend only (regens .env.local, mock on): `make frontend`
+- Tests: `make test-backend`, `make test-frontend`, or `make test` for both.
 
-1. python -m venv .venv
-2. source .venv/Scripts/activate # or source .venv/bin/activate
-3. pip install fastapi uvicorn[standard] python-dotenv "pydantic[email]" ruff black
-4. cd apps/api
-5. uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-   - Health: http://localhost:8000/health
+## Docker
 
-Env file: apps/api/.env (see apps/api/.env.example)
+Build images once:
+```
+make docker-build
+```
 
-- ENV=local
-- DATABASE_URL=postgresql://postgres:postgres@localhost:5432/resumax
-- AI_API_KEY=your-local-ai-key
-- AUTH_SECRET=dev-jwt-secret
-- STORAGE_ENDPOINT=http://localhost:9000
-- STORAGE_BUCKET=resumax
-- STORAGE_ACCESS_KEY=minioadmin
-- STORAGE_SECRET_KEY=minioadmin
-- REDIS_URL=redis://localhost:6379/0
-- BACKEND_URL=http://localhost:8000
-- FRONTEND_URL=http://localhost:3000
-- EMAIL_SENDER=noreply@resumax.local
+Run stack (db, redis, api, frontend) from images:
+```
+make docker-up
+```
+- Ctrl+C stops containers and runs `docker compose down`.
+- Frontend builds with `NEXT_PUBLIC_USE_AUTH_MOCK=false` by default.
 
-### Frontend (Next.js 14, pnpm)
+## Manual setup (optional)
 
-1. cd apps/frontend
-2. pnpm install
-3. pnpm dev
-   - App: http://localhost:3000
-   - Dashboard health check: http://localhost:3000/dashboard
+Backend:
+```
+cd apps/api
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env  # set DATABASE_URL, AUTH_SECRET, etc.
+alembic upgrade head
+uvicorn app.main:app --reload --port 8000
+```
 
-Env file: apps/frontend/.env.local
+Frontend:
+```
+cd apps/frontend
+pnpm install
+cp .env.local.example .env.local  # set NEXT_PUBLIC_API_BASE, mock flag
+pnpm dev
+```
 
-- NEXT_PUBLIC_API_BASE=http://localhost:8000
-
-### Lint/Format
-
-- Frontend: cd apps/frontend && pnpm lint
-- Backend: cd apps/api && ruff check . && ruff format . && black .
+## Lint/Format
+- Frontend: `cd apps/frontend && pnpm lint`
+- Backend: `cd apps/api && ruff check . && ruff format .`
