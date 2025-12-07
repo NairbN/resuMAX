@@ -17,7 +17,7 @@ const AuthGuard = ({ children }: AuthGuardProps) => {
 
   useEffect(() => {
     dispatch(me()).unwrap().catch(() => {
-      router.replace("/login");
+      router.replace("/");
     });
   }, [dispatch, router]);
 
