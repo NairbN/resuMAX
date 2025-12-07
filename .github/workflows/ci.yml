@@ -51,11 +51,8 @@ jobs:
           cache: 'pnpm'
           cache-dependency-path: apps/frontend/pnpm-lock.yaml
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
-          run_install: false
+      - name: Install pnpm
+        run: npm install -g pnpm@9
 
       - name: Verify pnpm
         run: pnpm --version
