@@ -52,7 +52,9 @@ jobs:
           cache-dependency-path: apps/frontend/pnpm-lock.yaml
 
       - name: Enable corepack
-        run: corepack enable
+        run: |
+          corepack enable
+          corepack prepare pnpm@9 --activate
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
