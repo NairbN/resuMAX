@@ -1,11 +1,9 @@
 import { api } from '@/services/api/client';
 import { getError } from '@/services/api/errors';
+import * as mock from './mock';
 import type { AuthResponse } from './types';
 
 const useMock = process.env.NEXT_PUBLIC_USE_AUTH_MOCK === 'true';
-
-// Lazy import mock implementations when flag is set
-const mock = useMock ? require('./mock') : null;
 
 export async function login(payload: { email: string; password: string }): Promise<AuthResponse> {
   if (useMock) {
