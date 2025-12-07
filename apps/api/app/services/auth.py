@@ -136,13 +136,12 @@ def signup(db: Session, email: str, password: str):
 
 
 def login(db: Session, email: str, password: str):
-    if _rate_limiter.is_limited(email):
+    user = db.query(User).filter(User.email == email).first()
+    if user and _rate_limiter.is_limited(email):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many attempts"
         )
-    user = db.query(User).filter(User.email == email).first()
     if not user:
-        _rate_limiter.record_failure(email)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
     if not _verify_password(password, user.password_hash):
