@@ -44,18 +44,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'pnpm'
           cache-dependency-path: apps/frontend/pnpm-lock.yaml
-
-      - name: Install pnpm
-        run: npm install -g pnpm@9
-
-      - name: Verify pnpm
-        run: pnpm --version
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
